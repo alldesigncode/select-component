@@ -1,0 +1,44 @@
+:host {
+  display: inline-block;
+  outline: none;
+
+  // temporary
+  transform: translateX(100px) translateY(400px);
+}
+
+.select {
+  width: 180px;
+  height: 48px;
+  border: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+
+  &.active {
+    z-index: 100000;
+  }
+}
+
+.select-panel-wrap {
+  width: inherit;
+  height: inherit;
+}
+
+.select-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border-left: 1px solid #ccc;
+  border-right: 1px solid #ccc;
+  border-bottom: 1px solid #ccc;
+}
+
+input {
+  width: 100%;
+  border: none;
+  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: hidden;
+  outline: 0;
+  cursor: pointer;
+  font-size: inherit;
+}

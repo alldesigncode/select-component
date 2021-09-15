@@ -1,0 +1,7 @@
+<div class="select-label">
+  <ng-container *ngIf="value; else content"></ng-container>
+  {{ value }}
+  <ng-template #content>
+    <ng-content></ng-content>
+  </ng-template>
+</div>

@@ -1,0 +1,31 @@
+<!-- This button triggers the overlay and is it's origin -->
+
+<div
+  class="select"
+  [class.active]="panelOpen"
+  (click)="togglePanel()"
+  cdkOverlayOrigin
+  #trigger="cdkOverlayOrigin"
+>
+  <div class="select-box">
+    {{ displayOption ? displayOption.value : "" }}
+  </div>
+</div>
+
+<ng-template
+  cdkConnectedOverlay
+  cdkConnectedOverlayHasBackdrop
+  cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
+  [cdkConnectedOverlayOrigin]="trigger"
+  [cdkConnectedOverlayOpen]="panelOpen"
+  [cdkConnectedOverlayOffsetY]="0"
+  [cdkConnectedOverlayWidth]="180"
+  (backdropClick)="close()"
+  (attach)="onAttach()"
+>
+  <div class="select-panel-wrap" @selectAnim>
+    <div class="select-panel" tabindex="-1" role="listbox">
+      <ng-content></ng-content>
+    </div>
+  </div>
+</ng-template>
