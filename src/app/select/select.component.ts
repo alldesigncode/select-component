@@ -1,10 +1,10 @@
 import { CdkConnectedOverlay } from '@angular/cdk/overlay';
+import { ViewportRuler } from '@angular/cdk/scrolling';
 import {
-  AfterContentInit,
+  ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
   ContentChildren,
-  Directive,
   ElementRef,
   HostBinding,
   HostListener,
@@ -12,13 +12,13 @@ import {
   OnInit,
   QueryList,
   ViewChild,
+  ViewEncapsulation,
 } from '@angular/core';
 import { SelectOptionComponent } from './select-option/select-option.component';
 import { ActiveDescendantKeyManager } from '@angular/cdk/a11y';
 import { SelectService } from './select.service';
 import { take, takeUntil } from 'rxjs/operators';
 import {
-  A,
   DOWN_ARROW,
   ENTER,
   hasModifierKey,
@@ -30,16 +30,62 @@ import {
 import { Subject } from 'rxjs';
 import { selectReveal } from './animations';
 
-@Directive()
-export abstract class SelectBase {
-  abstract selectOptions: QueryList<SelectOptionComponent>;
+const SELECT_PANEL_HEIGHT = 256;
+
+const SELECT_PANEL_PADDING = 5;
+
+const SELECT_OPTION_HEIGHT = 39;
+
+@Component({
+  selector: 'app-select',
+  templateUrl: './select.component.html',
+  styleUrls: ['./select.component.scss'],
+  animations: [selectReveal],
+  encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class SelectComponent implements OnInit, OnDestroy {
+  triggerRect: ClientRect;
 
   keyManager: ActiveDescendantKeyManager<SelectOptionComponent>;
 
-  @ViewChild(CdkConnectedOverlay, { static: true })
-  protected connectedOverlay: CdkConnectedOverlay;
+  @HostBinding('attr.tabIndex') tabIndex = 0;
 
-  protected readonly destroy$ = new Subject<void>();
+  @HostBinding('attr.role') role = 'combobox';
+
+  @HostBinding('attr.aria-autocomplete') autocomplete = 'none';
+
+  @ContentChildren(SelectOptionComponent, { descendants: true })
+  private selectOptions: QueryList<SelectOptionComponent>;
+
+  @ViewChild('trigger')
+  private trigger: ElementRef;
+
+  @ViewChild(CdkConnectedOverlay, { static: true })
+  private connectedOverlay: CdkConnectedOverlay;
+
+  @ViewChild('panel')
+  private panel: ElementRef;
+
+  @HostListener('keydown', ['$event'])
+  onKeyDown(event) {
+    this.panelOpen
+      ? this.handleOpenKeyDown(event)
+      : this.handleClosedKeyDown(event);
+  }
+
+  @HostListener('focus') onFocus() {
+    if (!this.disabled) {
+      this._focused = true;
+    }
+  }
+
+  @HostListener('blur') onBlur() {
+    this._focused = false;
+    if (!this.disabled && !this.panelOpen) {
+      this.changeDetectorRef.markForCheck();
+    }
+  }
 
   private _displayOption: SelectedOption;
 
@@ -47,10 +93,22 @@ export abstract class SelectBase {
 
   private _panelOpen = false;
 
-  constructor(protected elementRef: ElementRef) {}
+  private _focused = false;
+
+  private _disabled = false;
+
+  private readonly destroy$ = new Subject<void>();
 
   get panelOpen(): boolean {
     return this._panelOpen;
+  }
+
+  get focused(): boolean {
+    return this._focused;
+  }
+
+  get disabled(): boolean {
+    return this._disabled;
   }
 
   get displayOption(): SelectedOption {
@@ -65,15 +123,72 @@ export abstract class SelectBase {
     return !this._selectedOption;
   }
 
+  constructor(
+    private elementRef: ElementRef,
+    private changeDetectorRef: ChangeDetectorRef,
+    private viewportRuler: ViewportRuler,
+    private selectService: SelectService
+  ) {
+    this.selectService.init(this);
+  }
+
+  ngOnInit(): void {
+    this.viewportRuler
+      .change()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        if (this.panelOpen) {
+          this.triggerRect = this.trigger.nativeElement.getBoundingClientRect();
+          this.changeDetectorRef.markForCheck();
+        }
+      });
+  }
+
+  ngAfterContentInit() {
+    this.initKeyManager();
+  }
+
+  onAttach() {
+    this.connectedOverlay.positionChange.pipe(take(1)).subscribe(() => {
+      this.changeDetectorRef.detectChanges();
+      this.highlightOption();
+
+      if (this.panelOpen && this.panel) {
+        this.scrollPosition(this.keyManager.activeItemIndex || 0);
+      }
+    });
+  }
+
   onSelect(option: SelectOptionComponent) {
     this.keyManager.setActiveItem(option);
     this._selectedOption = option;
-    this._displayOption = { id: option.id, value: option.value };
+    this._displayOption = { value: option.value };
     this.close();
     this.focus();
+    this.changeDetectorRef.markForCheck();
   }
 
-  initKeyManager() {
+  open() {
+    this.updateRect();
+    this.highlightOption();
+    this.keyManager.withHorizontalOrientation(null);
+
+    this._panelOpen = !this._panelOpen;
+  }
+
+  close() {
+    if (this.panelOpen) {
+      this._panelOpen = false;
+      this.changeDetectorRef.markForCheck();
+    }
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private initKeyManager() {
     this.keyManager = new ActiveDescendantKeyManager<SelectOptionComponent>(
       this.selectOptions
     )
@@ -89,7 +204,7 @@ export abstract class SelectBase {
     });
   }
 
-  handleClosedKeyDown(event) {
+  private handleClosedKeyDown(event) {
     const keyCode = event.keyCode;
     const isArrowKey =
       keyCode === DOWN_ARROW ||
@@ -110,7 +225,7 @@ export abstract class SelectBase {
     }
   }
 
-  handleOpenKeyDown(event) {
+  private handleOpenKeyDown(event) {
     const manager = this.keyManager;
     const keyCode = event.keyCode;
     const isArrowKey = keyCode === DOWN_ARROW || keyCode === UP_ARROW;
@@ -130,10 +245,19 @@ export abstract class SelectBase {
       this.onSelect(manager.activeItem);
     } else {
       manager.onKeydown(event);
+      if (this.panelOpen && this.panel) {
+        this.scrollPosition(this.keyManager.activeItemIndex || 0);
+      }
     }
+
+    this.changeDetectorRef.markForCheck();
   }
 
-  highlightOption(): void {
+  private focus(options?: FocusOptions) {
+    this.elementRef.nativeElement.focus(options);
+  }
+
+  private highlightOption(): void {
     if (this.keyManager) {
       if (this.empty) {
         this.keyManager.setFirstItemActive();
@@ -143,72 +267,22 @@ export abstract class SelectBase {
     }
   }
 
-  focus(options?: FocusOptions) {
-    this.elementRef.nativeElement.focus(options);
-  }
-
-  togglePanel() {
-    this._panelOpen = !this._panelOpen;
-  }
-
-  close() {
-    if (this.panelOpen) {
-      this._panelOpen = false;
+  private scrollPosition(index: number) {
+    if (index === 0) {
+      this.panel.nativeElement.scrollTop = 0;
+    } else {
+      this.panel.nativeElement.scrollTop =
+        SELECT_OPTION_HEIGHT * index +
+        (SELECT_OPTION_HEIGHT - SELECT_PANEL_PADDING) -
+        Math.ceil(SELECT_PANEL_HEIGHT / 2);
     }
   }
-}
 
-@Component({
-  selector: 'app-select',
-  templateUrl: './select.component.html',
-  styleUrls: ['./select.component.scss'],
-  animations: [selectReveal],
-})
-export class SelectComponent
-  extends SelectBase
-  implements OnInit, AfterContentInit, OnDestroy
-{
-  @ContentChildren(SelectOptionComponent)
-  selectOptions: QueryList<SelectOptionComponent>;
-
-  @HostBinding('attr.tabIndex') tabIndex = 0;
-  @HostBinding('attr.role') role = 'combobox';
-
-  @HostListener('keydown', ['$event']) onKeyDown(event) {
-    this.panelOpen
-      ? this.handleOpenKeyDown(event)
-      : this.handleClosedKeyDown(event);
-  }
-
-  constructor(
-    protected elementRef: ElementRef,
-    private changeDetectorRef: ChangeDetectorRef,
-    private selectService: SelectService
-  ) {
-    super(elementRef);
-    this.selectService.init(this);
-  }
-
-  ngOnInit(): void {}
-
-  ngAfterContentInit() {
-    this.initKeyManager();
-  }
-
-  onAttach() {
-    this.connectedOverlay.positionChange.pipe(take(1)).subscribe(() => {
-      this.changeDetectorRef.detectChanges();
-      this.highlightOption();
-    });
-  }
-
-  ngOnDestroy() {
-    this.destroy$.next();
-    this.destroy$.complete();
+  private updateRect() {
+    this.triggerRect = this.trigger.nativeElement.getBoundingClientRect();
   }
 }
 
 export interface SelectedOption {
-  id: number;
   value: string;
 }

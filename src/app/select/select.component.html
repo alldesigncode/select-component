@@ -1,30 +1,32 @@
-<!-- This button triggers the overlay and is it's origin -->
-
 <div
-  class="select"
-  [class.active]="panelOpen"
-  (click)="togglePanel()"
+  class="select-trigger"
+  [ngClass]="{ active: panelOpen, focus: focused }"
+  (click)="open()"
   cdkOverlayOrigin
-  #trigger="cdkOverlayOrigin"
+  #origin="cdkOverlayOrigin"
+  #trigger
 >
-  <div class="select-box">
+  <div class="select-value">
     {{ displayOption ? displayOption.value : "" }}
   </div>
+  <div
+    class="select-arrow"
+    [ngClass]="{ 'caret-down': !panelOpen, 'caret-up': panelOpen }"
+  ></div>
 </div>
-
 <ng-template
   cdkConnectedOverlay
   cdkConnectedOverlayHasBackdrop
+  cdkConnectedOverlayLockPosition
   cdkConnectedOverlayBackdropClass="cdk-overlay-transparent-backdrop"
-  [cdkConnectedOverlayOrigin]="trigger"
+  [cdkConnectedOverlayOrigin]="origin"
   [cdkConnectedOverlayOpen]="panelOpen"
-  [cdkConnectedOverlayOffsetY]="0"
-  [cdkConnectedOverlayWidth]="180"
+  [cdkConnectedOverlayWidth]="triggerRect?.width"
   (backdropClick)="close()"
   (attach)="onAttach()"
 >
-  <div class="select-panel-wrap" @selectAnim>
-    <div class="select-panel" tabindex="-1" role="listbox">
+  <div class="select-panel-wrap" [@selectAnim]>
+    <div class="select-panel" tabindex="-1" role="listbox" #panel>
       <ng-content></ng-content>
     </div>
   </div>

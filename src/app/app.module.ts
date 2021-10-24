@@ -5,7 +5,7 @@ import { AppComponent } from './app.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { SelectComponent } from './select/select.component';
 import { SelectOptionComponent } from './select/select-option/select-option.component';
-import {OverlayModule} from '@angular/cdk/overlay';
+import { OverlayModule } from '@angular/cdk/overlay';
 
 @NgModule({
   declarations: [AppComponent, SelectComponent, SelectOptionComponent],

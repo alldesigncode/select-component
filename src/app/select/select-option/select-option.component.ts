@@ -14,9 +14,7 @@ import { SelectService } from '../select.service';
   styleUrls: ['./select-option.component.scss'],
 })
 export class SelectOptionComponent implements Highlightable {
-  @Input() id: number;
-
-  @Input() value: string;
+  @Input() value?: string;
 
   @HostBinding('class.active') active = false;
 
@@ -41,6 +39,7 @@ export class SelectOptionComponent implements Highlightable {
     this.focus();
     this.active = true;
   }
+
   setInactiveStyles(): void {
     this.active = false;
   }

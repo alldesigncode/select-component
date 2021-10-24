@@ -5,13 +5,13 @@ import { SelectComponent } from './select.component';
   providedIn: 'root',
 })
 export class SelectService {
-  private _parentInstance: SelectComponent;
+  private parentInstance: SelectComponent;
 
   init(parent: SelectComponent) {
-    this._parentInstance = parent;
+    this.parentInstance = parent;
   }
 
   getParent(): SelectComponent {
-    return this._parentInstance;
+    return this.parentInstance;
   }
 }
